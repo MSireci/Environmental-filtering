@@ -5,10 +5,12 @@ library(tidyr)
 source("correlation_analysis.r")
 
 # EXAMPLE FOR CROSSSECTIONAL DATA OF THE GLACIER BIOME
+
 load("./crossscdata.RData")
 
 
 #1- Obtain the OTU abundances for the desired biome
+
 # the table  will report the count, abundances and occurences of each OTU. Furthermore, we keep the code identifying  the dataset (project_id), the sample and the run id.
 abddata_Glacier<- datatax %>% filter(classification=="Glacier") %>% mutate( nruns = n_distinct(run_id) ) %>% 
   group_by(otu_id) %>% 
@@ -41,7 +43,7 @@ rm(abddata_Glacier)
 
 q_Glacier<-calculate_p2(d_Glacier, 17,dist_bin_ERP017997_Glacier, 10, 20, 15, 10)
 rm(dist_bin_ERP017997_Glacier)
-# see the description in correlation_analysis for an explanation of the last four input parameters. They are just parameters that split the file in subsets easier to apply left.join
+# see the description in correlation_analysis.r for an explanation of the last four input parameters. They are just parameters that split the file in subsets easier to apply left.join
 
 save(q_Glacier, file="./observable_Glacier.RData")
 
