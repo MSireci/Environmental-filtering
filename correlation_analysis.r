@@ -654,3 +654,56 @@ av_q_dt<-function(g_q)
   
   return(g)
 }
+
+ 
+# f) Randomizations to create null model. 
+#It just consist in running the analysis after having randomized the structure.
+#There are two ways of randomize: by tree (see function tree_randomization) or distance randomization  (see function distances_rand).  
+# By default I am using the distances_rand, but you can change the function in the first function line.
+# rand is the number of runs of the randomization underwhich we average.
+
+
+randomization<-function(gratio, rand, c)
+{
+  grandtree0<- distances_rand(gratio)
+  
+  dtotbinned<-av_q(grandtree0)
+  rm(grandtree0)
+  
+  
+  
+  for(i in 1:rand)
+  {
+    print(i)
+    grandtree<- distances_rand(gratio)
+    
+    
+    
+    dtotbinned2<-av_q(grandtree)
+    
+    dtotbinned<-rbind(dtotbinned, dtotbinned2)
+    rm(dtotbinned2)
+    
+  }
+  c<-1.96
+
+  
+  dtotbinned_rand_dist<- dtotbinned %>% filter(nbin>1)%>% group_by(b, observable)  %>% summarise(ld=sum(nbin/sum(nbin)*ld), 
+                                                                                                 Corr_av=sum(nbin*Corr/sum(nbin)), error=c*sqrt(sum((Corr-Corr_av)*(Corr-Corr_av)*nbin)/(sum(nbin)-1))/(sqrt(sum(nbin))),
+                                                                                                 nbin=sum(nbin) ) %>% ungroup()                                          
+  
+  dtotbinned_rand_dist<-  dtotbinned_rand_dist %>% rename(Corr=Corr_av) %>%
+    mutate(type="Null Model") %>%
+    mutate(nbin=as.integer(nbin/rand)) %>%
+    select( b ,   ld  , nbin,  error ,type ,  observable,    Corr )
+  
+  
+  
+  
+  
+  
+  
+  return(dtotbinned_rand_dist)
+}
+
+
