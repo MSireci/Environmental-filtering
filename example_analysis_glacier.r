@@ -61,4 +61,43 @@ rm(q_Glacier)
 p_rand_Glacier <-p_rand_Glacier %>%mutate(env="Glacier")
 save(p_rand_Glacier, file="./correlation_Glacier_rand.RData")
 
+# 7- plots
+require(ggplot2)
+require(viridis)
+
+cbp2 <- c( "#7D3102", "#23C710", "#E87203",
+           "#f9280B","#F3F011", "#8C0fAD","#0b4cf9", "#0ecab0")
+
+#choose environment
+p<-p_Glacier
+# Choose data type
+p1<- p %>% filter(type=="Data")  %>% filter(nbin>10^3) %>% mutate(corr_th=exp(-3.5*exp(ld*1/3)))
+
+#p1$env<-as.factor(p$env)
+
+# Choose observable
+p2 <- ggplot(p1 %>% filter(observable=="eta3"))+ theme()+
+  
+  geom_hline( yintercept = 0, color = "gray", size = 2 ) +
+  aes(
+    x=exp(ld),
+    y=(Corr),
+    shape=env,
+    color=env
+    
+    
+  )+
+  geom_point(,size=3.5, stroke=2)+
+  scale_colour_manual(values=cbp2)+
+  scale_shape_manual(values=1:8)+
+  #geom_errorbar(data=p %>%filter(type=="Null Model") %>% filter(nbin> 10^3), aes(ymin=eta1-error1, ymax=eta1+error1, x=exp(ld)), width=0.1)+
+  geom_smooth(data=p1, colour="black", aes(x=exp(ld), y=(corr_th),group = 1, weight = nbin), se = FALSE, size=1.5)+
+  scale_x_log10( " " ) +
+  scale_y_continuous(" " )+
+  mytheme_main+labs(colour=" ", shape=" ")+theme(legend.position = c("none"))+
+  labs(colour=" ", shape=" ")
+  #facet_wrap(~ observable, nrow = 2,  scale = "free_y")
+
+
+p2
 
