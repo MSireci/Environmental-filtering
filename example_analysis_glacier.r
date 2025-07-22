@@ -5,53 +5,52 @@ library(tidyr)
 source("correlation_analysis.r")
 
 # EXAMPLE FOR CROSSSECTIONAL DATA OF THE GLACIER BIOME
-
+# UPLOAD THE DATA
 load("./crosssecdata.RData")
 
 
 #1- Obtain the OTU abundances for the desired biome
 
-# the table  will report the count, abundances and occurences of each OTU. Furthermore, we keep the code identifying  the dataset (project_id), the sample and the run id.
+## Calculate abundances and keep the zeros
 
+abddata0<- datatax %>% filter(classification=="Glacier")  %>% filter(nreads > 10^4 )
+sp<- unique(abddata0$otu_id)
 
+sample_tot<- unique(abddata0$sample_id)
 
+abddata0_new<-abddata0[0,]
 
-abddata_Glacier0<- datatax %>% filter(classification=="Glacier")  %>% filter(nreads > 10^4 )
-sp<- unique(abddata_Glacier0$otu_id)
-
-sample_tot<- unique(abddata_Glacier0$sample_id)
-
-abddata_Glacier0_new<-abddata_Glacier0[0,]
 for(sample_ch in sample_tot ){
   
-  abddata_Glacier0_1<-abddata_Glacier0 %>% filter(sample_id==sample_ch)
-  proj_id<-unique(abddata_Glacier0_1$project_id)
-  run<-unique(abddata_Glacier0_1$run_id)
-  reads<-unique(abddata_Glacier0_1$nreads)
-  env<-unique(abddata_Glacier0_1$classification)
-  sp1<-unique(abddata_Glacier0_1$otu_id)
+  abddata0_1<-abddata0 %>% filter(sample_id==sample_ch)
+  proj_id<-unique(abddata0_1$project_id)
+  run<-unique(abddata0_1$run_id)
+  reads<-unique(abddata0_1$nreads)
+  env<-unique(abddata0_1$classification)
+  sp1<-unique(abddata0_1$otu_id)
   
   absent<- setdiff(sp,sp1)
   absent0<- as.data.frame(absent) %>% mutate(count=0,project_id=proj_id, sample_id=sample_ch, run_id=run,nreads=reads, classification=env)
   colnames(absent0)[1]<-"otu_id"
-  abddata_Glacier0_2<- rbind(abddata_Glacier0_1,absent0) %>% unique()
-  abddata_Glacier0_new<- rbind(abddata_Glacier0_new,abddata_Glacier0_2)
-  rm(abddata_Glacier0_1,abddata_Glacier0_2,absent,absent0)
+  abddata0_2<- rbind(abddata0_1,absent0) %>% unique()
+  abddata0_new<- rbind(abddata0_new,abddata0_2)
+  rm(abddata0_1,abddata0_2,absent,absent0)
 }
 
-abddata_Glacier<- abddata_Glacier0_new %>% filter(classification=="Glacier") %>% mutate( nruns = n_distinct(run_id) ) %>% 
+abddata<- abddata0_new %>% filter(classification=="Glacier") %>% mutate( nruns = n_distinct(run_id) ) %>% 
   group_by(otu_id) %>% mutate( mf = mean(count/nreads), occ = n_distinct(run_id)/nruns ) %>% 
   ungroup() %>% filter(nreads > 10^4 )%>% select(otu_id, count, project_id, sample_id, run_id, classification, nreads, nruns, mf, occ)
 
-save(abddata_Glacier,file="./abd_Glacier0.RData")
-rm(datatax,abddata_Glacier0_new,sample_tot,sample_ch,env,proj_id,reads,run,sp,sp1)
+save(abddata,file="./abd_Glacier0.RData")
+rm(datatax,abddata0_new,sample_tot,sample_ch,env,proj_id,reads,run,sp,sp1)
+
 
 
 # 2-Obtain the phylogenetic distances of the communities in the biomes
 
 # The information of each dataset is encoded in the project id classification
 
-project_id<- (abddata_Glacier %>% select(project_id) %>%unique())$project_id
+project_id<- (abddata %>% select(project_id) %>%unique())$project_id
 
 # Construct the phylogenetic distance file of the communities of this datset (project_id) and order them in n=17 bin
 
@@ -63,7 +62,7 @@ load("./dist_bin_ERP017997_Glacier.RData")
 
 # 3- Obtain the fluctuation estimators
 
-d_Glacier<-calculate_abd(abddata_Glacier)
+d_Glacier<-calculate_abd(abddata)
 save(d_Glacier, file="./estimator_flu_Glacier0.RData")
 rm(abddata_Glacier)
 
@@ -147,5 +146,4 @@ p2 <- ggplot(p1 %>% filter(observable=="eta3"))+ theme()+
 
 
 p2
-
 
