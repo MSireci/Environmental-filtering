@@ -6,18 +6,45 @@ source("correlation_analysis.r")
 
 # EXAMPLE FOR CROSSSECTIONAL DATA OF THE GLACIER BIOME
 
-load("./crossscdata.RData")
+load("./crosssecdata.RData")
 
 
 #1- Obtain the OTU abundances for the desired biome
 
 # the table  will report the count, abundances and occurences of each OTU. Furthermore, we keep the code identifying  the dataset (project_id), the sample and the run id.
-abddata_Glacier<- datatax %>% filter(classification=="Glacier") %>% mutate( nruns = n_distinct(run_id) ) %>% 
-  group_by(otu_id) %>% 
-  mutate( mf = mean(count/nreads), occ = n_distinct(run_id)/nruns ) %>% 
-  ungroup() %>% filter(nreads > 10^4 )%>% select(otu_id, count, project_id, sample_id, run_id, classification, nreads, nruns, mf, occ)
-  rm(datatax)
 
+
+
+
+abddata_Glacier0<- datatax %>% filter(classification=="Glacier")  %>% filter(nreads > 10^4 )
+sp<- unique(abddata_Glacier0$otu_id)
+
+sample_tot<- unique(abddata_Glacier0$sample_id)
+
+abddata_Glacier0_new<-abddata_Glacier0[0,]
+for(sample_ch in sample_tot ){
+  
+  abddata_Glacier0_1<-abddata_Glacier0 %>% filter(sample_id==sample_ch)
+  proj_id<-unique(abddata_Glacier0_1$project_id)
+  run<-unique(abddata_Glacier0_1$run_id)
+  reads<-unique(abddata_Glacier0_1$nreads)
+  env<-unique(abddata_Glacier0_1$classification)
+  sp1<-unique(abddata_Glacier0_1$otu_id)
+  
+  absent<- setdiff(sp,sp1)
+  absent0<- as.data.frame(absent) %>% mutate(count=0,project_id=proj_id, sample_id=sample_ch, run_id=run,nreads=reads, classification=env)
+  colnames(absent0)[1]<-"otu_id"
+  abddata_Glacier0_2<- rbind(abddata_Glacier0_1,absent0) %>% unique()
+  abddata_Glacier0_new<- rbind(abddata_Glacier0_new,abddata_Glacier0_2)
+  rm(abddata_Glacier0_1,abddata_Glacier0_2,absent,absent0)
+}
+
+abddata_Glacier<- abddata_Glacier0_new %>% filter(classification=="Glacier") %>% mutate( nruns = n_distinct(run_id) ) %>% 
+  group_by(otu_id) %>% mutate( mf = mean(count/nreads), occ = n_distinct(run_id)/nruns ) %>% 
+  ungroup() %>% filter(nreads > 10^4 )%>% select(otu_id, count, project_id, sample_id, run_id, classification, nreads, nruns, mf, occ)
+
+save(abddata_Glacier,file="./abd_Glacier0.RData")
+rm(datatax,abddata_Glacier0_new,sample_tot,sample_ch,env,proj_id,reads,run,sp,sp1)
 
 
 # 2-Obtain the phylogenetic distances of the communities in the biomes
@@ -37,53 +64,73 @@ load("./dist_bin_ERP017997_Glacier.RData")
 # 3- Obtain the fluctuation estimators
 
 d_Glacier<-calculate_abd(abddata_Glacier)
+save(d_Glacier, file="./estimator_flu_Glacier0.RData")
 rm(abddata_Glacier)
-  
+
+load("./estimator_flu_Glacier0.RData")
+
 # 4- Construct the pearson correlation for each species couples and link it to their phylogenetic distance
 
-q_Glacier<-calculate_p2(d_Glacier, 17,dist_bin_ERP017997_Glacier, 10, 20, 15, 10)
+q_Glacier<-calculate_p2(d_Glacier,17,dist_bin_ERP017997_Glacier)
+
 rm(dist_bin_ERP017997_Glacier)
-# see the description in correlation_analysis.r for an explanation of the last four input parameters. They are just parameters that split the file in subsets easier to apply left.join
 
 save(q_Glacier, file="./observable_Glacier.RData")
 
 # 5- Obtain the average decay
 
 p_Glacier<-av_q(q_Glacier)
+
 p_Glacier<- p_Glacier %>% mutate(env="Glacier")
 save(p_Glacier, file="./correlation_Glacier.RData")
 
 # 6- Null/Randomized model= Check if the correlation decay disappears when the distances are randomized
+# rand is the number of randomizations runs
 
-p_rand_Glacier<-randomization(q_Glacier, rand, 1.96)
+p_rand_Glacier<-randomization(q_Glacier, 10, 1.96)
 rm(q_Glacier)
 
 p_rand_Glacier <-p_rand_Glacier %>%mutate(env="Glacier")
 save(p_rand_Glacier, file="./correlation_Glacier_rand.RData")
 
-# 7- plots
-require(ggplot2)
-require(viridis)
 
+############################# Decay plots ############################################
+mytheme_main <- theme_bw() + theme(
+  legend.title  = element_text(family="Helvetica", size=25, color = "black"
+  ),
+  legend.key = element_blank(),
+  legend.text  = element_text(family="Helvetica", size=30, color = "black"),
+  panel.background = element_rect(fill="transparent"),
+  #plot.background = element_rect(fill="transparent", colour = NA),
+  panel.grid = element_blank(),
+  text = element_text( family="Helvetica", size=25, color = "black"),
+  panel.border = element_blank(),
+  axis.title = element_text( family="Helvetica", size=35, color = "black"),
+  axis.text = element_text( family="Helvetica", size=12, color = "black"),
+  axis.line = element_line(size = 1., color = "black"),
+  axis.ticks = element_line(size = 1.,color = "black"),
+  legend.background = element_rect(fill="transparent")
+)
+
+
+
+color<-c("red2","blue2","darkorange2","springgreen4","deeppink2","gold","mediumpurple2","tan4")
 cbp2 <- c( "#7D3102", "#23C710", "#E87203",
            "#f9280B","#F3F011", "#8C0fAD","#0b4cf9", "#0ecab0")
 
-#choose environment
-p<-p_Glacier
-# Choose data type
+p<-p_glacier
+
 p1<- p %>% filter(type=="Data")  %>% filter(nbin>10^3) %>% mutate(corr_th=exp(-3.5*exp(ld*1/3)))
 
 #p1$env<-as.factor(p$env)
-
-# Choose observable
 p2 <- ggplot(p1 %>% filter(observable=="eta3"))+ theme()+
   
   geom_hline( yintercept = 0, color = "gray", size = 2 ) +
   aes(
     x=exp(ld),
     y=(Corr),
-    shape=env,
-    color=env
+    #shape=env,
+   # color=env
     
     
   )+
@@ -100,4 +147,5 @@ p2 <- ggplot(p1 %>% filter(observable=="eta3"))+ theme()+
 
 
 p2
+
 
