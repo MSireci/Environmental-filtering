@@ -108,7 +108,7 @@ distance_bin <-function(project_id_name, abddata,nbins){
     rid <-(unique(com2$run_id))[1]#<-qui prende solo un run_id per comunità
     
     
-  
+    
     filename <- paste("./trees/tree_", project_id_name,"_", sid, "_", rid, ".tsv", sep = "")
     f <- read_tree_greengenes(filename)
     system.time(d2<-cophenetic(f))
@@ -116,7 +116,7 @@ distance_bin <-function(project_id_name, abddata,nbins){
     #calculate distances with cutoff at ten decimals, and not reporting the doubles
     df_dist <-rbind( data.frame(otu2=rownames(d2)[row(d2)], otu1=colnames(d2)[col(d2)], dist=c(d2))%>% filter(as.numeric(otu1) > as.numeric(otu2)) %>% 
                        mutate( dist = round(dist,10)),df_dist )
-  
+    
     rm(d2)
     df_dist<-df_dist  %>% unique()%>%  filter(!is.na(dist))
     #bin the distance
@@ -125,7 +125,7 @@ distance_bin <-function(project_id_name, abddata,nbins){
   
   print("end")
   
-
+  
   df_dist_bin<-df_dist  %>% unique() %>%  filter(!is.na(dist))%>% mutate( otu1 = as.integer(as.character(otu1)) ,
                                                                           otu2 = as.integer(as.character(otu2)) ,
                                                                           dist = as.double(dist))
@@ -208,7 +208,72 @@ calculate_abd<-function(abddata)
 
 
 # b) From species estimators for each coubple, we  construct a data frame relating for each species couuple its correlation quantifiers q1 etc, with the phylogenetic distance. This is done for each bin.
-calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
+
+# do it for each sample
+
+
+calculate_p<-function(d_tot, dist,bin){
+  
+  df<-as.data.frame(dist) %>% filter(b==bin) %>%  mutate( otu1 = as.integer(as.character(otu1)) ,
+                                                          otu2 = as.integer(as.character(otu2)) )
+  
+  rm(dist)
+  
+  print(bin)
+  
+  
+#take only relevant species
+d_tot1<- d_tot %>% filter(otu_id %in% df$otu1)
+d_tot2<- d_tot %>% filter(otu_id %in% df$otu2)
+
+sp1<- df$otu1
+sp2<- df$otu2
+rm(d_tot1,d_tot2)
+#first construct the overlap using the sample
+
+sample_tot<-d_tot %>% select(sample_id) %>% unique()
+sample_tot<-c(sample_tot$sample_id)
+
+df2<-tibble(
+  
+  
+  otu1=as.integer(),otu2=as.integer(), dist=as.double(), b=as.integer(), sample_id=as.integer(), 
+  q1_a=as.double(), q2_a=as.double(), q3_a=as.double(), q4_a=as.double(), q5_a=as.double(), 
+  q1_b=as.double(), q2_b=as.double(), q3_b=as.double(), q4_b=as.double(), q5_b=as.double())
+
+# cycle over the samples
+for(sample_ch in sample_tot){
+  
+  d_tot_a<- d_tot %>% filter(sample_id == sample_ch)
+  #take only the species that will be joined from the abundances 
+  d_tot_a1<- d_tot_a %>% filter(otu_id %in% sp1) %>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5)
+  d_tot_a2<- d_tot_a %>% filter(otu_id %in% sp2) %>% rename(otu2 = otu_id, q1_b = q1, q2_b = q2, q3_b = q3, q4_b = q4, q5_b = q5)
+  rm(d_tot_a)
+  
+  sp1_a<-unique(d_tot_a1$otu1)
+  sp1_b<-unique(d_tot_a2$otu2)
+  
+  #take only the species that will be joined from the distances 
+  df1<- df %>% filter(otu1 %in% sp1_a) %>% filter(otu2 %in% sp1_b)
+  df1<-df1 %>% left_join(d_tot_a1, by=( by=c("otu1"="otu1")))
+  rm(d_tot_a1)
+  df1<- df1 %>% left_join(d_tot_a2, by=( by=c("otu2"="otu2","sample_id"="sample_id","project_id"="project_id")))
+  rm(d_tot_a2)
+  df1<-df1 %>% unique()
+  df2<-rbind(df2,df1)
+  rm(df1)
+  
+}
+return(df2)
+}
+
+
+
+
+
+# old way with not so nice cycles
+
+calculate_p_old<-function(d_tot, dist, bin,h, c,h2, k)
 {
   # EXPLICATION OF INPUTS h, c, h2, k. 
   # the dataframes are really heavy, and hence to perform the "left-join " with the distance file  I need to cut them in subsets and perform a loop.
@@ -222,7 +287,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
   rm(dist)
   
   print(bin)
-
+  
   
   
   
@@ -247,7 +312,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
     
     
     # c parameters for division of cycles
-    c
+  
     
     a<-as.integer(as.integer(length(sample_tot))/c)
     # b<-as.integer(length(couple))-c*a
@@ -267,7 +332,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
       
       
       
-      df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) )  ) 
+      df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) ),  by=c("otu1"="otu1")  ) 
       
       
       df1<- df1 %>%  left_join( d_tot1%>% rename(otu2 = otu_id, q1_b = q1, q2_b = q2, q3_b = q3, q4_b = q4, q5_b = q5) %>% mutate(otu2 = as.integer(otu2) ), 
@@ -288,7 +353,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
     
     
     rm(d_tot)
-    df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) )  ) 
+    df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) ),by=c("otu1"="otu1")   ) 
     
     
     df1<- df1 %>%  left_join( d_tot1%>% rename(otu2 = otu_id, q1_b = q1, q2_b = q2, q3_b = q3, q4_b = q4, q5_b = q5) %>% mutate(otu2 = as.integer(otu2) ), 
@@ -333,7 +398,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
       
       
       
-      df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) )  ) 
+      df1<- df %>%  left_join( d_tot1%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) ),by=c("otu1"="otu1")   ) 
       
       
       df1<- df1 %>%  left_join( d_tot1%>% rename(otu2 = otu_id, q1_b = q1, q2_b = q2, q3_b = q3, q4_b = q4, q5_b = q5) %>% mutate(otu2 = as.integer(otu2) ), 
@@ -372,7 +437,7 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
     
   }
   else{
-    df<- df %>%  left_join( d_tot%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) )  ) 
+    df<- df %>%  left_join( d_tot%>% rename(otu1 = otu_id, q1_a = q1, q2_a = q2, q3_a = q3, q4_a = q4, q5_a = q5) %>% mutate(otu1 = as.integer(otu1) ),  by=c("otu1"="otu1")  ) 
     
     
     df<- df %>%  left_join( d_tot%>% rename(otu2 = otu_id, q1_b = q1, q2_b = q2, q3_b = q3, q4_b = q4, q5_b = q5) %>% mutate(otu2 = as.integer(otu2) ), 
@@ -390,14 +455,14 @@ calculate_p<-function(d_tot, dist, bin,h, c,h2, k)
 
 
 ###################### c) The operation above is repaeted for each bin.
-calculate_p2<-function(dtot,bmax, dist, h, c, h2, k)
+calculate_p2<-function(dtot,bmax, dist)
 {
   
   
-  g_q<-calculate_p(dtot, dist,0, h, c, h2,k)
+  g_q<-calculate_p(dtot, dist,0)
   
   for(b in 1:bmax){
-    g1<-calculate_p(dtot,dist, b ,h,c, h2, k)
+    g1<-calculate_p(dtot,dist, b)
     g_q<-rbind(g_q,g1)
     rm(g1)
   }
@@ -655,12 +720,6 @@ av_q_dt<-function(g_q)
   return(g)
 }
 
- 
-# f) Randomizations to create null model. 
-#It just consist in running the analysis after having randomized the structure.
-#There are two ways of randomize: by tree (see function tree_randomization) or distance randomization  (see function distances_rand).  
-# By default I am using the distances_rand, but you can change the function in the first function line.
-# rand is the number of runs of the randomization underwhich we average.
 
 
 randomization<-function(gratio, rand, c)
